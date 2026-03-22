@@ -1,51 +1,18 @@
-import json
-import requests
-import streamlit as st
+server {
+    listen 80;
+    server_name _;
 
-API_BASE = "http://127.0.0.1:8000"
-
-st.set_page_config(page_title="SQL Validation Agent", layout="wide")
-st.title("SQL Validation Agent")
-
-source_sql = st.text_area("Source SQL", height=220)
-target_sql = st.text_area("Target SQL", height=220)
-mappings_text = st.text_area(
-    "Mappings JSON (optional)",
-    value="[]",
-    height=140,
-    help='Example: [{"source_column":"cust_id","target_column":"customer_id"}]',
-)
-
-if st.button("Validate"):
-    try:
-        mappings = json.loads(mappings_text) if mappings_text.strip() else []
-    except json.JSONDecodeError:
-        st.error("Mappings JSON is invalid.")
-        st.stop()
-
-    payload = {
-        "source_sql": source_sql,
-        "target_sql": target_sql,
-        "source_schema": {
-            "table_name": "placeholder",
-            "columns": []
-        },
-        "target_schema": {
-            "table_name": "placeholder",
-            "columns": []
-        },
-        "mappings": mappings
+    location / {
+        proxy_pass http://127.0.0.1:8501/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
-    resp = requests.post(f"{API_BASE}/validate", json=payload, timeout=120)
-
-    if resp.ok:
-        data = resp.json()
-        st.subheader("Summary")
-        st.write(data.get("summary", ""))
-
-        st.subheader("Issues")
-        for issue in data.get("issues", []):
-            st.write(f"- **{issue['severity']}** | {issue['category']} | {issue['message']}")
-    else:
-        st.error(resp.text)
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
